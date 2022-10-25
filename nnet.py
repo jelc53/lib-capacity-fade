@@ -1,7 +1,9 @@
+import pickle
+
 def load_data(filename):
     with open(filename, 'rb') as f:
-        data = f.load_pickle()
-    
+        data = pickle.load(f)
+
     return data
 
 if __name__ == "__main__":
