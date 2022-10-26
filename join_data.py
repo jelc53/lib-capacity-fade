@@ -5,9 +5,15 @@ import os
 
 def load_data(batch1_file, batch2_file, batch3_file):
     """Read each batch and combine into signle data dictionary"""
-    batch1 = pickle.load(open(os.path.join('data', batch1_file), 'rb'))
-    batch2 = pickle.load(open(os.path.join('data', batch2_file), 'rb'))
-    batch3 = pickle.load(open(os.path.join('data', batch3_file), 'rb'))
+
+    with open(os.path.join('data', batch1_file), 'rb') as f:
+        batch1 = pickle.load(f)
+
+    with open(os.path.join('data', batch2_file), 'rb') as f:
+        batch2 = pickle.load(f)
+
+    # with open(os.path.join('data', batch3_file), 'rb') as f:
+    #     batch3 = pickle.load(f)
 
     # remove batteries that do not reach 80% capacity
     del batch1['b1c8']
@@ -41,18 +47,22 @@ def load_data(batch1_file, batch2_file, batch3_file):
     del batch2['b2c16']
 
     # remove noisy channels from batch3
-    del batch3['b3c37']
-    del batch3['b3c2']
-    del batch3['b3c23']
-    del batch3['b3c32']
-    del batch3['b3c42']
-    del batch3['b3c43']
+    # del batch3['b3c37']
+    # del batch3['b3c2']
+    # del batch3['b3c23']
+    # del batch3['b3c32']
+    # del batch3['b3c42']
+    # del batch3['b3c43']
 
     numBat1 = len(batch1.keys())
     numBat2 = len(batch2.keys())
-    numBat3 = len(batch3.keys())
+    # numBat3 = len(batch3.keys())
     # numBat = numBat1 + numBat2 + numBat3
-    bat_dict = {**batch1, **batch2, **batch3}
+    bat_dict = {
+        **batch1,
+        **batch2,
+        # **batch3
+    }
 
     return bat_dict
 
