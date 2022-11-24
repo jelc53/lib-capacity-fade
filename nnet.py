@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import keras
 import pickle
 import numpy as np
@@ -6,17 +5,12 @@ import sys
 np.set_printoptions(threshold=sys.maxsize)
 
 ###Data loading
-=======
-import pickle
-
->>>>>>> 59893fec965ba4a8b2f424b1c4664bf318b77b3e
 def load_data(filename):
     with open(filename, 'rb') as f:
         data = pickle.load(f)
 
     return data
 
-<<<<<<< HEAD
 #Change the path to where you've put the data
 data_dict = load_data('/Users/knataraj/Documents/Academic/Stanford/CS229/project/processed_data.pkl')
 bat_dict = data_dict
@@ -179,7 +173,3 @@ print(np.mean(np.abs(predictions-y)/y))
 predictionst = model.predict(test_mat)
 yt = yt.reshape(-1,1)
 print(np.mean(np.abs(predictionst-yt)/yt))
-=======
-if __name__ == "__main__":
-    data_dict = load_data(filename)
->>>>>>> 59893fec965ba4a8b2f424b1c4664bf318b77b3e
