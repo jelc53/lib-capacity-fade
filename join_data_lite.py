@@ -12,8 +12,8 @@ def load_data(batch1_file, batch2_file, batch3_file):
     with open(os.path.join('data', batch2_file), 'rb') as f:
         batch2 = pickle.load(f)
 
-    # with open(os.path.join('data', batch3_file), 'rb') as f:
-    #     batch3 = pickle.load(f)
+    with open(os.path.join('data', batch3_file), 'rb') as f:
+        batch3 = pickle.load(f)
 
     # remove batteries that do not reach 80% capacity
     del batch1['b1c8']
@@ -47,28 +47,28 @@ def load_data(batch1_file, batch2_file, batch3_file):
     del batch2['b2c16']
 
     # remove noisy channels from batch3
-    # del batch3['b3c37']
-    # del batch3['b3c2']
-    # del batch3['b3c23']
-    # del batch3['b3c32']
-    # del batch3['b3c42']
-    # del batch3['b3c43']
+    del batch3['b3c37']
+    del batch3['b3c2']
+    del batch3['b3c23']
+    del batch3['b3c32']
+    del batch3['b3c42']
+    del batch3['b3c43']
 
     numBat1 = len(batch1.keys())
     numBat2 = len(batch2.keys())
-    # numBat3 = len(batch3.keys())
+    numBat3 = len(batch3.keys())
     # numBat = numBat1 + numBat2 + numBat3
     bat_dict = {
         **batch1,
         **batch2,
-        # **batch3
+        **batch3
     }
 
     return bat_dict
 
 
 def remove_intracycle_data(bat_dict):
-    """"""
+    """Delete intra cycle data dictionary from each b#c#"""
     for bc_ref in bat_dict.keys():
         del bat_dict[bc_ref]['cycles']
 
