@@ -11,7 +11,8 @@
             "program": "${file}",
             "cwd": "${fileDirname}",
             "console": "integratedTerminal",
-            "justMyCode": true
+            "justMyCode": true,
+            "args": ["processed_data_lite.pkl"]
         }
     ]
 }
