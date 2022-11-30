@@ -102,15 +102,15 @@ def prepare_data_for_stan(dfs):
     y = []
     N_BC = []
 
-    for df in dfs:
+    for df in dfs[:10]:
         N_BC.append(df.shape[0])
         y.append(np.array(df['QD']))
-    X = create_features(dfs)
+    X = create_features(dfs).loc[:9]
     y = np.hstack(y)
 
     return {
         'T': np.sum(N_BC),               # total number of cycles
-        'N': len(dfs),
+        'N': len(dfs[:10]),
         'd': X.shape[1],
         'y': y,                          # flattened labels
         'x1': np.array(X['x1']),
@@ -128,10 +128,11 @@ def prepare_code_for_stan():
         real soh_decay(
             real x,
             real alpha,
-            real beta,
+            //real beta,
             real gamma
         ) {
-            return 2 - exp(alpha*(pow(x, beta) - gamma));
+            // return 2 - exp(alpha*(pow(x, beta) - gamma));
+            return 2 - exp(alpha*(x - gamma));
         }
     }
     data {
@@ -150,10 +151,10 @@ def prepare_code_for_stan():
         real alpha_2;
         real alpha_3;
 
-        real beta_0;
-        real beta_1;
-        real beta_2;
-        real beta_3;
+        //real beta_0;
+        //real beta_1;
+        //real beta_2;
+        //real beta_3;
 
         real gamma_0;
         real gamma_1;
@@ -164,7 +165,7 @@ def prepare_code_for_stan():
     }
     transformed parameters {
         vector[N] alpha;
-        vector[N] beta;
+        //vector[N] beta;
         vector[N] gamma;
         vector[T] y_hat;
     {
@@ -173,29 +174,30 @@ def prepare_code_for_stan():
 
         for(i in 1:N) {
             alpha[i] = alpha_0 + alpha_1*x1[i] + alpha_2*x2[i] + alpha_3*x3[i];
-            beta[i] = beta_0 + beta_1*x1[i] + beta_2*x2[i] + beta_3*x3[i];
+            //beta[i] = beta_0 + beta_1*x1[i] + beta_2*x2[i] + beta_3*x3[i];
             gamma[i] = gamma_0 + gamma_1*x1[i] + gamma_2*x2[i] + gamma_3*x3[i];
 
             for (j in 1:N_BC[i]) {
                 scaled_cycle_count = j / 1000.0;
-                y_hat[idx] = soh_decay(scaled_cycle_count, alpha[i], beta[i], gamma[i]);
+                //y_hat[idx] = soh_decay(scaled_cycle_count, alpha[i], beta[i], gamma[i]);
+                y_hat[idx] = soh_decay(scaled_cycle_count, alpha[i], gamma[i]);
                 idx += 1;
             }
         }
     }
     }
     model {
-        alpha_0 ~ normal(0, 1);
+        alpha_0 ~ normal(0.2, 1);
         alpha_1 ~ normal(0, 1);
         alpha_2 ~ normal(0, 1);
         alpha_3 ~ normal(0, 1);
 
-        beta_0 ~ normal(0, 1);
-        beta_1 ~ normal(0, 1);
-        beta_2 ~ normal(0, 1);
-        beta_3 ~ normal(0, 1);
+        //beta_0 ~ normal(2, 1);
+        //beta_1 ~ normal(0, 1);
+        //beta_2 ~ normal(0, 1);
+        //beta_3 ~ normal(0, 1);
 
-        gamma_0 ~ normal(0, 1);
+        gamma_0 ~ normal(0.4, 1);
         gamma_1 ~ normal(0, 1);
         gamma_2 ~ normal(0, 1);
         gamma_3 ~ normal(0, 1);
@@ -254,7 +256,7 @@ if __name__ == '__main__':
     data = load_data(os.path.join('data', infile))
     dfs = create_summary_dfs(data)
 
-    print(test_script_for_stan())
+    # print(test_script_for_stan())
     stan_code = prepare_code_for_stan()
     stan_data = prepare_data_for_stan(dfs)
     posterior = stan.build(stan_code, data=stan_data, random_seed=101)
