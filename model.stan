@@ -1,14 +1,19 @@
-// Julian Cooper 2022
-
 functions {
-    real soh_decay(
+    real exponential_decay(
         real x,
         real alpha,
-        //real beta,
+        real beta,
         real gamma
     ) {
-        // return 2 - exp(alpha*(pow(x, beta) - gamma));
-        return 2 - exp(alpha*(x - gamma));
+        return 2 - exp(alpha*(pow(x, beta) - gamma));
+    }
+    real inv_sigmoid(
+        real x,
+        real alpha,
+        real beta,
+        real gamma
+    ) {
+        return gamma - (1 / (1 + exp(-alpha * (x - beta))));
     }
 }
 data {
@@ -27,21 +32,21 @@ parameters {
     real alpha_2;
     real alpha_3;
 
-    //real beta_0;
-    //real beta_1;
-    //real beta_2;
-    //real beta_3;
+    real beta_0;
+    real beta_1;
+    real beta_2;
+    real beta_3;
 
-    real gamma_0;
-    real gamma_1;
-    real gamma_2;
-    real gamma_3;
+    //real gamma_0;
+    //real gamma_1;
+    //real gamma_2;
+    //real gamma_3;
 
     real<lower=0> sigma;
 }
 transformed parameters {
     vector[N] alpha;
-    //vector[N] beta;
+    vector[N] beta;
     vector[N] gamma;
     vector[T] y_hat;
 {
@@ -50,33 +55,33 @@ transformed parameters {
 
     for(i in 1:N) {
         alpha[i] = alpha_0 + alpha_1*x1[i] + alpha_2*x2[i] + alpha_3*x3[i];
-        //beta[i] = beta_0 + beta_1*x1[i] + beta_2*x2[i] + beta_3*x3[i];
-        gamma[i] = gamma_0 + gamma_1*x1[i] + gamma_2*x2[i] + gamma_3*x3[i];
+        beta[i] = beta_0 + beta_1*x1[i] + beta_2*x2[i] + beta_3*x3[i];
+        gamma[i] = x1[i];
 
         for (j in 1:N_BC[i]) {
             scaled_cycle_count = j / 1000.0;
-            //y_hat[idx] = soh_decay(scaled_cycle_count, alpha[i], beta[i], gamma[i]);
-            y_hat[idx] = soh_decay(scaled_cycle_count, alpha[i], gamma[i]);
+            //y_hat[idx] = exponential_decay(scaled_cycle_count, alpha[i], beta[i], gamma[i]);
+            y_hat[idx] = inv_sigmoid(scaled_cycle_count, alpha[i], beta[i], gamma[i]);
             idx += 1;
         }
     }
 }
 }
 model {
-    alpha_0 ~ normal(0.2, 1);
+    alpha_0 ~ normal(2.5, 1);
     alpha_1 ~ normal(0, 1);
     alpha_2 ~ normal(0, 1);
     alpha_3 ~ normal(0, 1);
 
-    //beta_0 ~ normal(2, 1);
-    //beta_1 ~ normal(0, 1);
-    //beta_2 ~ normal(0, 1);
-    //beta_3 ~ normal(0, 1);
+    beta_0 ~ normal(2.5, 1);
+    beta_1 ~ normal(0, 1);
+    beta_2 ~ normal(0, 1);
+    beta_3 ~ normal(0, 1);
 
-    gamma_0 ~ normal(0.4, 1);
-    gamma_1 ~ normal(0, 1);
-    gamma_2 ~ normal(0, 1);
-    gamma_3 ~ normal(0, 1);
+    //gamma_0 ~ normal(1.1, 1);
+    //gamma_1 ~ normal(0, 1);
+    //gamma_2 ~ normal(0, 1);
+    //gamma_3 ~ normal(0, 1);
 
     sigma ~ gamma(1, 2);
 
