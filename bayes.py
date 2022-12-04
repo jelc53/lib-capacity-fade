@@ -13,8 +13,8 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_percentage_error
 from common import generate_posterior_histograms, generate_traceplots
 
-MODEL_ID = 2 
-USE_CACHE = False
+MODEL_ID = 2
+USE_CACHE = True
 
 
 def create_summary_dfs(data):
@@ -95,7 +95,7 @@ def evaluate_fit(y_test, params, model_id, start_idx=100, scale=1000):
     return mse_store, rul_mape_store
 
 
-def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=5, scale=1000):
+def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=10, scale=1000):
     """Plot y_true vs y_pred for specified alpha, beta, gamma"""
     for i, id in enumerate(test_bat_ids):
         if i >= num_plots:
@@ -119,6 +119,7 @@ def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=5, scale=100
 
 def create_features(train_data):
     """[PLACEHOLDER FUNCTION FOR KARTHIK"""
+    # print(train_data.groupby(['bat_id']).last().index)
     X_df = train_data.groupby(['bat_id']).last().reset_index(drop=True)
     X_df.columns = X_df.columns.str.lower()
 
@@ -345,19 +346,19 @@ if __name__ == '__main__':
         2: [np.ones(n)*2.5, np.ones(n)*2.5, np.ones(n)*1.1],  # shape, midpoint, asymptote
     }
     X_test = create_features(test_dat)
-    params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
-    # params = [fit['alpha'].mean(axis=1), fit['beta'].mean(axis=1), fit['gamma'].mean(axis=1)]
-    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+    # params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
+    params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
+    mse_store, rul_mape_store = evaluate_fit(y_train, params=params, model_id=MODEL_ID)  # y_test
 
     # write results
-    param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
-    generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
-    generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+    # param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
+    # generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
+    # generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
 
-    param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
-    generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
-    generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
+    # param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
+    # generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
+    # generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_examples(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_examples(y_train, train_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
