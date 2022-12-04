@@ -13,7 +13,8 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_percentage_error
 from common import generate_posterior_histograms, generate_traceplots
 
-MODEL_ID = 2
+MODEL_ID = 2 
+USE_CACHE = False
 
 
 def create_summary_dfs(data):
@@ -62,7 +63,7 @@ def get_pred(num_cycles, params, model_id, scale=1000):
     return y_pred
 
 
-def get_rul(threshold, params, model_id):
+def get_rul(threshold, params, model_id, scale=1000):
     """Helper function to access prediction for remianing useful life"""
     # cycle_life = int(data['cycle_life'][0]) - 2
     # nominal = data['summary']['QD'][1]
@@ -70,8 +71,9 @@ def get_rul(threshold, params, model_id):
     count = 0
     while y_val > threshold:
         count += 1
-        y_val = fetch_model(count, params, model_id)
-    y_pred = count
+        scaled_x = count / scale
+        y_val = fetch_model(scaled_x, params, model_id)
+    y_pred = count / scale
 
     return y_pred
 
@@ -93,26 +95,26 @@ def evaluate_fit(y_test, params, model_id, start_idx=100, scale=1000):
     return mse_store, rul_mape_store
 
 
-def plot_examples(data, ex_list, params, model_id, scale=1000):
+def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=5, scale=1000):
     """Plot y_true vs y_pred for specified alpha, beta, gamma"""
-    i = 0
-    for bc in data.keys():
-        if bc in ex_list:
-            y_test_i = data[bc]['summary']['QD'][1:].copy()
-            cycle_life = len(y_test_i)  # y_test_i[-1]
-            params_i = [params[0][i], params[1][i], params[2][i]]
+    for i, id in enumerate(test_bat_ids):
+        if i >= num_plots:
+            break
 
-            y_pred, y_true = get_pred(cycle_life, params_i, model_id), y_test_i
-            x = np.linspace(0, cycle_life, cycle_life) / scale
+        y_test_i = y_test[i]
+        cycle_life = len(y_test_i)  # y_test_i[-1]
+        params_i = [params[0][i], params[1][i], params[2][i]]
 
-            plt.scatter(x, y_true, color='grey')
-            plt.plot(x, y_pred, color='r')
-            plt.ylim((0.8, 1.2))
+        y_pred, y_true = get_pred(cycle_life, params_i, model_id), y_test_i
+        x = np.linspace(0, cycle_life, cycle_life) / scale
 
-            outfile = 'bayes_plot_' + bc + '.png'
-            plt.savefig(os.path.join('figs', outfile))
-            plt.show(); plt.close()
-        i += 1
+        plt.scatter(x, y_true, color='grey')
+        plt.plot(x, y_pred, color='r')
+        plt.ylim((0.8, 1.2))
+
+        outfile = 'bayes_plot_' + id + '.png'
+        plt.savefig(os.path.join('figs', outfile))
+        plt.show(); plt.close()
 
 
 def create_features(train_data):
@@ -120,12 +122,7 @@ def create_features(train_data):
     X_df = train_data.groupby(['bat_id']).last().reset_index(drop=True)
     X_df.columns = X_df.columns.str.lower()
 
-    # for df in dfs:
-    #     x1_nominal_capacity.append(df.loc[1,'QD'])
-    #     x2_average_temperature.append(df.loc[1,'Tavg'])
-    #     x3_qd_pct_change_first100.append((df.loc[100,'QD']-df.loc[1,'QD'])/df.loc[1,'QD'])
-
-    x1_nominal_capacity = train_data.groupby(['bat_id']).nth(1)['QD']
+    x1_nominal_capacity = train_data.groupby(['bat_id']).nth(5)['QD']
     x2_variance_100v10 = X_df['variance'].copy()
     x3_log_min_difference = X_df['log|min(delta(q(v)))|'].copy()
     x4_chargetime_average = X_df['chargetimeavg cyc1-5'].copy()
@@ -207,9 +204,9 @@ def prepare_code_for_stan():
         real scaled_cycle_count;
 
         for(i in 1:N) {
-            alpha[i] = a_0 + a_1*X[i,1] + a_2*X[i,2] + a_3*X[i,3] + a_4*X[i,4];
-            beta[i] = b_0 + b_1*X[i,1] + b_2*X[i,2] + b_3*X[i,3] + b_4*X[i,4];
-            gamma[i] = X[i,1];
+            alpha[i] = a_0 + a_1*X[i,1] + a_2*X[i,2] + a_3*X[i,3] + a_4*X[i,4] + a_5*X[i,5];
+            beta[i] = b_0 + b_1*X[i,1] + b_2*X[i,2] + b_3*X[i,3] + b_4*X[i,4] + b_5*X[i,5];
+            gamma[i] = X[i,1];  // first few entries have measurment error
 
             for (j in 1:N_BC[i]) {
                 scaled_cycle_count = j / 1000.0;
@@ -222,10 +219,18 @@ def prepare_code_for_stan():
     }
     model {
         a_0 ~ normal(2.5, 1);
-        a_1, a_2, a_3, a_4 ~ normal(0, 1);
+        a_1 ~ normal(0, 1);
+        a_2 ~ normal(0, 1);
+        a_3 ~ normal(0, 1);
+        a_4 ~ normal(0, 1);
+        a_5 ~ normal(0, 1);
 
         b_0 ~ normal(2.5, 1);
-        b_1, b_2, b_3, b_4 ~ normal(0, 1);
+        b_1 ~ normal(0, 1);
+        b_2 ~ normal(0, 1);
+        b_3 ~ normal(0, 1);
+        b_4 ~ normal(0, 1);
+        b_5 ~ normal(0, 1);
 
         //g_0 ~ normal(1.1, 1);
         //g_1 ~ normal(0, 1);
@@ -293,17 +298,15 @@ def prepare_params_given_samples(fit, X):
 
 def prepare_label_data(data_dict, train_ids, test_ids):
     """Helper function to prepare labels for train and test"""
-    train_y, test_y = [], []
-    for bc in data_dict:
+    train_y = []
+    for id in train_ids:
+        train_y.append(data_dict[id]['summary']['QD'][1:])
 
-        if bc in train_ids:
-            train_y.append(data_dict[bc]['summary']['QD'][1:])
+    test_y = []
+    for id in test_ids:
+        test_y.append(data_dict[id]['summary']['QD'][1:])
 
-        elif bc in test_ids:
-            test_y.append(data_dict[bc]['summary']['QD'][1:])
-
-        else:
-            print("Error: we are missing some battery ids!")
+    # print("Error: we are missing some battery ids!")
 
     return train_y, test_y
 
@@ -316,19 +319,24 @@ if __name__ == '__main__':
     train_dat = pd.read_csv(os.path.join('data', 'train.csv'))
     test_dat = pd.read_csv(os.path.join('data', 'test.csv'))
 
-    train_bat_ids = np.array(train_dat['bat_id'].drop_duplicates())
-    test_bat_ids = np.array(test_dat['bat_id'].drop_duplicates())
+    train_bat_ids = sorted(train_dat['bat_id'].unique())
+    test_bat_ids = sorted(test_dat['bat_id'].unique())
     y_train, y_test = prepare_label_data(data, train_bat_ids, test_bat_ids)
 
     # bayes model
-    # print(test_script_for_stan())
-    stan_code = prepare_code_for_stan()
-    X_train = create_features(train_dat)
-    stan_data = prepare_data_for_stan(X_train, y_train)
-    posterior = stan.build(stan_code, data=stan_data, random_seed=101)
-    fit = posterior.sample(num_samples=1000, num_chains=1)
-    save_pickle(posterior, filename='model.pkl')
-    save_pickle(fit, filename='fit.pkl')
+    if USE_CACHE:
+        # 0: dummy data, 1: misordered y-var, 2: complete version
+        fit = load_data(os.path.join('data', 'fit_2.pkl'))
+
+    else:
+        # print(test_script_for_stan())
+        stan_code = prepare_code_for_stan()
+        X_train = create_features(train_dat)
+        stan_data = prepare_data_for_stan(X_train, y_train)
+        posterior = stan.build(stan_code, data=stan_data, random_seed=101)
+        fit = posterior.sample(num_samples=1000, num_chains=1)
+        save_pickle(posterior, filename='model_2.pkl')
+        save_pickle(fit, filename='fit_2.pkl')
 
     # evaluate fit
     n = len(y_test)
@@ -338,23 +346,18 @@ if __name__ == '__main__':
     }
     X_test = create_features(test_dat)
     params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
-    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)
+    # params = [fit['alpha'].mean(axis=1), fit['beta'].mean(axis=1), fit['gamma'].mean(axis=1)]
+    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
 
     # write results
-    param_list = [
-        'alpha_0',
-        'alpha_1',
-        'alpha_2',
-        'alpha_3',
-        'beta_0',
-        'beta_1',
-        'beta_2',
-        'beta_3',
-        'sigma'
-    ]
-    generate_posterior_histograms(fit, param_list)
-    generate_traceplots(fit, param_list)
+    param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
+    generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
+    generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+
+    param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
+    generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
+    generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_examples(data, params=params, model_id=MODEL_ID, ex_list=['b1c0', 'b1c1'])
+    plot_examples(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids

@@ -27,7 +27,7 @@ def generate_posterior_histograms(fit_obj, param_list, prefix=''):
     plt.tight_layout()
 
     for j in range(n_params):
-        ax[j].hist(fit_obj[param_list[j]], bins=50)
+        ax[j].hist(fit_obj[param_list[j]].flatten().tolist(), bins=50)
         ax[j].set_xlabel(param_list[j])
     outfile = prefix + 'sampled_histogram.png'
     plt.savefig(os.path.join('figs', outfile))
