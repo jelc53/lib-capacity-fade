@@ -286,8 +286,8 @@ def test_script_for_stan():
 
 def prepare_params_given_samples(fit, X):
     """Helper function to pull together mle estimates given posterior samples"""
-    a_0, a_1, a_2, a_3, a_4, a_5 = fit['a_0'].mean(), fit['a_1'].mean(), fit['a_2'].mean(), fit['a_3'].mean(), fit['a_4'].mean(), fit['a_5'].mean()
-    b_0, b_1, b_2, b_3, b_4, b_5 = fit['b_0'].mean(), fit['b_1'].mean(), fit['b_2'].mean(), fit['b_3'].mean(), fit['b_4'].mean(), fit['b_5'].mean()
+    a_0, a_1, a_2, a_3, a_4, a_5 = np.median(fit['a_0']), np.median(fit['a_1']), np.median(fit['a_2']), np.median(fit['a_3']), np.median(fit['a_4']), np.median(fit['a_5'])
+    b_0, b_1, b_2, b_3, b_4, b_5 = np.median(fit['b_0']), np.median(fit['b_1']), np.median(fit['b_2']), np.median(fit['b_3']), np.median(fit['b_4']), np.median(fit['b_5'])
     # g_0, g_1 = fit['g_i'].mean(), fit['g_0'].mean()
 
     alpha = a_0 + a_1*X[:, 0] + a_2*X[:, 1] + a_3*X[:, 2] + a_4*X[:, 3] + a_5*X[:, 4]
@@ -346,19 +346,19 @@ if __name__ == '__main__':
         2: [np.ones(n)*2.5, np.ones(n)*2.5, np.ones(n)*1.1],  # shape, midpoint, asymptote
     }
     X_test = create_features(test_dat)
-    # params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
-    params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
-    mse_store, rul_mape_store = evaluate_fit(y_train, params=params, model_id=MODEL_ID)  # y_test
+    params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
+    # params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
+    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
 
     # write results
-    # param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
-    # generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
-    # generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+    param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
+    generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
+    generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
 
-    # param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
-    # generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
-    # generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
+    param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
+    generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
+    generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_examples(y_train, train_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_examples(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
