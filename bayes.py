@@ -2,6 +2,7 @@ import os
 import sys
 
 import stan
+import arviz
 import pandas as pd
 import numpy as np
 
@@ -95,8 +96,9 @@ def evaluate_fit(y_test, params, model_id, start_idx=100, scale=1000):
     return mse_store, rul_mape_store
 
 
-def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=10, scale=1000):
+def plot_predicted_curve(y_test, test_bat_ids, params, model_id, num_plots=1, scale=1000):
     """Plot y_true vs y_pred for specified alpha, beta, gamma"""
+    plt.rcParams.update({'font.size': 14})
     for i, id in enumerate(test_bat_ids):
         if i >= num_plots:
             break
@@ -107,11 +109,20 @@ def plot_examples(y_test, test_bat_ids, params, model_id, num_plots=10, scale=10
 
         y_pred, y_true = get_pred(cycle_life, params_i, model_id), y_test_i
         x = np.linspace(0, cycle_life, cycle_life) / scale
+        # x2 = np.linspace(0, 2*cycle_life, cycle_life) / scale
 
-        plt.scatter(x, y_true, color='grey')
+        plt.scatter(x, y_true, color='grey', s=0.75)
         plt.plot(x, y_pred, color='r')
         plt.ylim((0.8, 1.2))
+        # plt.ylim((0, 1.2))
 
+        # plt.title(r'$\gamma - 1 / (1+\exp(-\alpha(x-\beta)))$')
+        # plt.title(r'$\gamma - exp(\alpha(x-\beta))$')
+        plt.ylabel('Discharge capacity (Qd) for {}'.format(id))
+        plt.xlabel('Number of cycles / 1000')
+
+        # outfile = 'example_inv_sigmoid.png'
+        # outfile = 'example_exponetial_decay.png'
         outfile = 'bayes_plot_' + id + '.png'
         plt.savefig(os.path.join('figs', outfile))
         plt.show(); plt.close()
@@ -342,13 +353,19 @@ if __name__ == '__main__':
     # evaluate fit
     n = len(y_test)
     map = {
-        1: [np.ones(n)*0.2, np.ones(n)*2, np.ones(n)*0.4],  # alpha, beta, gam
-        2: [np.ones(n)*2.5, np.ones(n)*2.5, np.ones(n)*1.1],  # shape, midpoint, asymptote
+        1: [np.ones(n)*0.2, np.ones(n)*2.1, -np.ones(n)*0.1],  # alpha, beta, gam
+        2: [np.ones(n)*3, np.ones(n)*1.4, np.ones(n)*1.1],  # shape, midpoint, asymptote
     }
     X_test = create_features(test_dat)
-    params = prepare_params_given_samples(fit, X_test)  # params = map[MODEL_ID]
+    # params = map[MODEL_ID]
+    params, params_low, params_high = prepare_params_given_samples(fit, X_test)
     # params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
     mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+
+    # Autocorrelation
+    sample_arr = np.array(fit.to_frame()[[fit.param_names[i] for i in range(13)]])
+    ess = arviz.ess(arviz.convert_to_dataset(sample_arr.reshape(1,-1,13)))
+    print('Number of effective samples: {}'.format(ess.mean()))
 
     # write results
     param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
@@ -361,4 +378,41 @@ if __name__ == '__main__':
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_examples(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_predicted_curve(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_predicted_curve_with_error(y_test, test_bat_ids, params=params, model_id=MODEL_ID)
+
+
+
+def plot_predicted_curve_with_error(y_test, test_bat_ids, params, model_id, num_plots=1, scale=1000):
+    """Plot y_true vs y_pred for specified alpha, beta, gamma"""
+    plt.rcParams.update({'font.size': 14})
+    for i, id in enumerate(test_bat_ids):
+        if i >= num_plots:
+            break
+
+        y_test_i = y_test[i]
+        cycle_life = len(y_test_i)  # y_test_i[-1]
+        params_i = [params[0][i], params[1][i], params[2][i]]
+
+        y_pred, y_true = get_pred(cycle_life, params_i, model_id), y_test_i
+        y_pred_low = get_pred(cycle_life, params_low_i, model_id)
+        y_pred_high = get_pred(cycle_life, params_high_i, model_id)
+        x = np.linspace(0, cycle_life, cycle_life) / scale
+        # x2 = np.linspace(0, 2*cycle_life, cycle_life) / scale
+
+        plt.scatter(x, y_true, color='grey', s=0.75)
+        plt.fill_between(x, y_pred_low, y_pred_high)
+        plt.plot(x, y_pred, color='r')
+        plt.ylim((0.8, 1.2))
+        # plt.ylim((0, 1.2))
+
+        # plt.title(r'$\gamma - 1 / (1+\exp(-\alpha(x-\beta)))$')
+        # plt.title(r'$\gamma - exp(\alpha(x-\beta))$')
+        plt.ylabel('Discharge capacity (Qd) for {}'.format(id))
+        plt.xlabel('Number of cycles / 1000')
+
+        # outfile = 'example_inv_sigmoid.png'
+        # outfile = 'example_exponetial_decay.png'
+        outfile = 'bayes_plot_' + id + '.png'
+        plt.savefig(os.path.join('figs', outfile))
+        plt.show(); plt.close()
