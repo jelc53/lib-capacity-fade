@@ -234,7 +234,7 @@ In constructing our Bayesian Inference Model we made a number of design choices,
 
 \end{enumerate}
 
-To sample from our joint posterior, we use the Hamiltonian Monte Carlo No U-Turn sampling method (Stan in-built). See Appendix 5.2 for detailed analysis of posterior marginals and sampling efficiency.
+To sample from our joint posterior, we use the Hamiltonian Monte Carlo No U-Turn sampling method (Stan in-built). See Appendix 5.2 for detailed analysis of posterior marginals and sampling efficiency. \newline
 
 \textbf{Model evaluation}: On out-of-sample test data, our model achieves Mean Square Error of [xx] for SOH prediction and Mean Absolute Percentage Error of [yy] for RUL prediction. [...]
 
@@ -242,12 +242,12 @@ To sample from our joint posterior, we use the Hamiltonian Monte Carlo No U-Turn
     \begin{figure}[H]
         \centering
         \begin{subfigure}[b]{0.49\linewidth}
-            \includegraphics[width=\linewidth]{figs/bayes_plot_b1c0.png}
-            \caption{Results for [b1c0]}
+            \includegraphics[width=\linewidth]{figs/bayes_plot_with_error_b1c0.png}
+            \caption{SOH MSE = [xx], RUL MAPE = [yy]}
         \end{subfigure}
         \begin{subfigure}[b]{0.49\linewidth}
-            \includegraphics[width=\linewidth]{figs/bayes_plot_b1c1.png}
-            \caption{Results for [b1c1]}
+            \includegraphics[width=\linewidth]{figs/bayes_plot_with_error_b1c0.png}
+            \caption{SOH MSE = [xx], RUL MAPE = [yy]}
         \end{subfigure}
         \caption{Predicted discharge capacity over normalized cycle life}
         \label{fig:bayespred}
@@ -376,7 +376,7 @@ When considering sampling efficiency we also consider auto-correlation between s
 \subsection{GDA, an alternative model}
 We built a GDA model for RUL/cycle life predictions as a comparison to the neural net and because it had not, to our knowledge, been done before. Furthermore, it could also be reasonable to believe that the different batteries come from some normal distributions with respect to cycle life. We created one class per 100th increase in cycle life, i. e 19 separate classes, equally spaced between 100 and 1900, and tried to assign each battery in the test set to one of these classes. The model took 27 different features per cycle for each battery and tried to classify the cycle life based on the first 100 cycles. The features were not scaled. As labels, we used the known cycle life of each battery. Specifically we used an LDA (linear discriminant analysis) model implemented using the SKlearn LinearDiscriminantAnalysis class \cite{scikit-learn}. The results are presented in \ref{fig:GDA_scatter}. We notice an accuracy similar to the neural network with a MAPE of $13.14\%$. However, it should be emphasized that we did predictions on discrete classes and not on the exact cycle life.
 
-\begin{figure}
+\begin{figure}[H]
     \centering
     \includegraphics[scale=0.6]{figs/GDA scatter plot.png}
     \caption{GDA results scatter plot}
