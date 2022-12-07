@@ -393,8 +393,8 @@ if __name__ == '__main__':
     # evaluate fit
     n = len(y_test)
     map = {
-        1: [np.ones(n)*0.2, np.ones(n)*2.1, -np.ones(n)*0.1],  # alpha, beta, gam
-        2: [np.ones(n)*3, np.ones(n)*1.4, np.ones(n)*1.1],  # shape, midpoint, asymptote
+        1: [np.ones((n,10))*0.2, np.ones((n,10))*2.1, np.ones((n,1))*0.1],  # alpha, beta, gam
+        2: [np.ones((n,10))*3, np.ones((n,10))*1.4, np.ones((n,1))*1.1],  # shape, midpoint, asymptote
     }
     X_test = create_features(test_dat)
     # params = map[MODEL_ID]
@@ -408,13 +408,13 @@ if __name__ == '__main__':
     print('Number of effective samples: {}'.format(ess.mean()))
 
     # write results
-    # param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
-    # generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
-    # generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+    param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
+    generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
+    generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
 
-    # param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
-    # generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
-    # generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
+    param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
+    generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
+    generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
