@@ -377,8 +377,8 @@ if __name__ == '__main__':
 
     # bayes model
     if USE_CACHE:
-        # 0: dummy data, 1: misordered y-var, 2: complete version
-        fit = load_data(os.path.join('data', 'fit_2.pkl'))
+        # 0: dummy data, 1: original formulation, 2: added hyperprior
+        fit = load_data(os.path.join('data', 'fit_1.pkl'))
 
     else:
         # print(test_script_for_stan())
@@ -387,8 +387,8 @@ if __name__ == '__main__':
         stan_data = prepare_data_for_stan(X_train, y_train)
         posterior = stan.build(stan_code, data=stan_data, random_seed=101)
         fit = posterior.sample(num_samples=1000, num_chains=1)
-        save_pickle(posterior, filename='model_2.pkl')
-        save_pickle(fit, filename='fit_2.pkl')
+        save_pickle(posterior, filename='model_1.pkl')
+        save_pickle(fit, filename='fit_1.pkl')
 
     # evaluate fit
     n = len(y_test)

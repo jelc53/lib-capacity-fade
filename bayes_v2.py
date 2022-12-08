@@ -238,8 +238,11 @@ def prepare_code_for_stan():
         array[N] int N_BC;          // cycle life for each battery cell
     }
     parameters {
-        real a_0, a_1, a_2, a_3, a_4, a_5;
-        real b_0, b_1, b_2, b_3, b_4, b_5;
+        vector[N] a_0;
+        vector[N] b_0;
+        real a_mu, b_mu;
+        real a_1, a_2, a_3, a_4, a_5;
+        real b_1, b_2, b_3, b_4, b_5;
         //real g_0, g_1;
 
         real<lower=0> sigma;
@@ -254,8 +257,8 @@ def prepare_code_for_stan():
         real scaled_cycle_count;
 
         for(i in 1:N) {
-            alpha[i] = a_0 + a_1*X[i,1] + a_2*X[i,2] + a_3*X[i,3] + a_4*X[i,4] + a_5*X[i,5];
-            beta[i] = b_0 + b_1*X[i,1] + b_2*X[i,2] + b_3*X[i,3] + b_4*X[i,4] + b_5*X[i,5];
+            alpha[i] = a_0[i] + a_1*X[i,1] + a_2*X[i,2] + a_3*X[i,3] + a_4*X[i,4] + a_5*X[i,5];
+            beta[i] = b_0[i] + b_1*X[i,1] + b_2*X[i,2] + b_3*X[i,3] + b_4*X[i,4] + b_5*X[i,5];
             gamma[i] = X[i,1];  // first few entries have measurment error
 
             for (j in 1:N_BC[i]) {
@@ -268,14 +271,14 @@ def prepare_code_for_stan():
     }
     }
     model {
-        a_0 ~ normal(2.5, 1);
+        a_0 ~ normal(a_mu, 1);
         a_1 ~ normal(0, 1);
         a_2 ~ normal(0, 1);
         a_3 ~ normal(0, 1);
         a_4 ~ normal(0, 1);
         a_5 ~ normal(0, 1);
 
-        b_0 ~ normal(2.5, 1);
+        b_0 ~ normal(b_mu, 1);
         b_1 ~ normal(0, 1);
         b_2 ~ normal(0, 1);
         b_3 ~ normal(0, 1);
@@ -285,6 +288,8 @@ def prepare_code_for_stan():
         //g_0 ~ normal(1.1, 1);
         //g_1 ~ normal(0, 1);
 
+        a_mu ~ normal(3, 1);
+        b_mu ~ normal(2, 1);
         sigma ~ gamma(1, 2);
 
         y ~ normal(y_hat, sigma);
@@ -377,7 +382,7 @@ if __name__ == '__main__':
 
     # bayes model
     if USE_CACHE:
-        # 0: dummy data, 1: misordered y-var, 2: complete version
+        # 0: dummy data, 1: original formulation, 2: added hyperprior
         fit = load_data(os.path.join('data', 'fit_2.pkl'))
 
     else:
@@ -399,7 +404,7 @@ if __name__ == '__main__':
     X_test = create_features(test_dat)
     # params = map[MODEL_ID]
     params = prepare_params_given_samples(fit, X_test)
-    # params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
+    # params = [fit['alpha'], fit['beta'], np.median(fit['gamma'], axis=1)]
     mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
 
     # Autocorrelation
@@ -418,5 +423,5 @@ if __name__ == '__main__':
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_predicted_curve(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
-    plot_predicted_curve_with_error(y_test, test_bat_ids, params=params, model_id=MODEL_ID)
+    plot_predicted_curve(X_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_predicted_curve_with_error(X_test, test_bat_ids, params=params, model_id=MODEL_ID)
