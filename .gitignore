@@ -1,5 +1,5 @@
 #ignore data folder
-data/
+#data/
 build/
 
 #ignore Matlab files
