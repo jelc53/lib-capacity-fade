@@ -57,7 +57,7 @@ def fetch_model(x, params, model_id):
 def get_pred(num_cycles, params, model_id, scale=1000):
     """Helper function to access predictions for discharge capacity"""
     n_samples = params[0].shape[0]
-    params_preproc = [[params[0][i], params[1][i], params[2]] for i in range(n_samples)]
+    params_preproc = [[params[0][i], params[1][i], params[2][i]] for i in range(n_samples)]
 
     x = np.linspace(0, num_cycles, num_cycles) / scale  # / cycle_life
     # y_pred = fetch_model(x, params, model_id)
@@ -68,9 +68,9 @@ def get_pred(num_cycles, params, model_id, scale=1000):
 
 def get_rul(threshold, params, model_id, scale=1000):
     """Helper function to access prediction for remianing useful life"""
-    y_val = params[2]  # nominal
+    y_val = params[2][0]  # nominal
     count = 0
-    while y_val > threshold:
+    while y_val > threshold or count > 2500:
         count += 1
         scaled_x = count / scale
         y_vals = fetch_model(scaled_x, params, model_id)
@@ -191,7 +191,7 @@ def create_features(train_data):
 
     # X_scaled = scale(X_df)
     X_scaled = np.hstack((x1_nominal_capacity.reshape(-1,1), X_scaled))
-    X_scaled = np.hstack((np.ones((X_df.shape[0],1)), X_scaled))
+    # X_scaled = np.hstack((np.ones((X_df.shape[0],1)), X_scaled))
     return X_scaled
 
 
@@ -240,24 +240,26 @@ def prepare_code_for_stan():
         array[N] int N_BC;          // cycle life for each battery cell
     }
     parameters {
-        real a[d];
-        real b[d];
+        vector[d] a;
+        vector[d] b;
+
+        real a_0, b_0;
 
         real<lower=0> sigma;
     }
     transformed parameters {
-        vector[N] alpha;
-        vector[N] beta;
-        vector[N] gamma;
+        vector<lower=0>[N] alpha;
+        vector<lower=0>[N] beta;
+        vector<lower=0>[N] gamma;
         vector[T] y_hat;
     {
         int idx = 1;
         real scaled_cycle_count;
 
         for(i in 1:N) {
-            alpha[i] = dot_product(X[i], a);
-            beta[i] = dot_product(X[i], b);
-            gamma[i] = X[i,2];  // first few entries have measurment error
+            alpha[i] = a_0 + dot_product(X[i,:], a);
+            beta[i] = b_0 + dot_product(X[i,:], b);
+            gamma[i] = X[i,1];  // nominal
 
             for (j in 1:N_BC[i]) {
                 scaled_cycle_count = j / 1000.0;
@@ -269,8 +271,12 @@ def prepare_code_for_stan():
     }
     }
     model {
-        a ~ normal(0, 5);
-        b ~ normal(0, 5);
+        a ~ normal(0, 2);
+        b ~ normal(0, 2);
+
+        a_0 ~ normal(3, 2);
+        b_0 ~ normal(2, 2);
+
         sigma ~ gamma(1, 2);
 
         y ~ normal(y_hat, sigma);
@@ -321,15 +327,12 @@ def test_script_for_stan():
 
 def prepare_params_given_samples(fit, X):
     """Helper function to pull together mle estimates given posterior samples"""
-    x_1, x_2, x_3, x_4, x_5 = [X[:, i].reshape(1,-1) for i in range(X.shape[1])]
+    n_samples = fit.num_samples
 
-    a_0, a_1, a_2, a_3, a_4, a_5 = fit['a_0'], fit['a_1'], fit['a_2'], fit['a_3'], fit['a_4'], fit['a_5']
-    b_0, b_1, b_2, b_3, b_4, b_5 = fit['b_0'], fit['b_1'], fit['b_2'], fit['b_3'], fit['b_4'], fit['b_5']
-    # g_0, g_1 = fit['g_0'], fit['g_1']
+    alpha = X @ fit['a']
+    beta = X @ fit['b']
 
-    alpha = a_0 + x_1.T@a_1 + x_2.T@a_2 + x_3.T@a_3 + x_4.T@a_4 + x_5.T@a_5
-    beta = b_0 + x_1.T@b_1 + x_2.T@b_2 + x_3.T@b_3 + x_4.T@b_4 + x_5.T@b_5
-    gamma = x_1.T  # g_0 + g_1*x_1
+    gamma = np.repeat(X[:,1].reshape(-1,1), n_samples, axis=1)
 
     return [alpha, beta, gamma]
 
@@ -347,6 +350,15 @@ def prepare_label_data(data_dict, train_ids, test_ids):
     # print("Error: we are missing some battery ids!")
 
     return train_y, test_y
+
+
+def stan_init(X):
+    """Specify sensible initializations"""
+    d = X.shape[1]
+    return {
+        'a': np.hstack((3, np.zeros(d-1))),
+        'b': np.hstack((2, np.zeros(d-1)))
+    }
 
 
 if __name__ == '__main__':
@@ -370,39 +382,39 @@ if __name__ == '__main__':
         # print(test_script_for_stan())
         stan_code = prepare_code_for_stan()
         X_train = create_features(train_dat)
-        stan_data = prepare_data_for_stan(X_train, y_train)
+        stan_data = prepare_data_for_stan(X_train[:40,:], y_train[:40])
         posterior = stan.build(stan_code, data=stan_data, random_seed=101)
-        fit = posterior.sample(num_samples=1000, num_chains=1)
-        save_pickle(posterior, filename='model_2.pkl')
+        fit = posterior.sample(num_samples=1000, num_chains=1, init=[stan_init(X_train)])
+        # save_pickle(posterior, filename='model_2.pkl')
         save_pickle(fit, filename='fit_2.pkl')
 
     # evaluate fit
     n = len(y_test)
     map = {
-        1: [np.ones((n,10))*0.2, np.ones((n,10))*2.1, np.ones((n,1))*0.1],  # alpha, beta, gam
-        2: [np.ones((n,10))*3, np.ones((n,10))*1.4, np.ones((n,1))*1.1],  # shape, midpoint, asymptote
+        1: [np.ones((n,10))*0.2, np.ones((n,10))*2.1, np.ones((n,10))*0.1],  # alpha, beta, gam
+        2: [np.ones((n,10))*3, np.ones((n,10))*1.4, np.ones((n,10))*1.1],  # shape, midpoint, asymptote
     }
     X_test = create_features(test_dat)
     # params = map[MODEL_ID]
     params = prepare_params_given_samples(fit, X_test)
     # params = [fit['alpha'], fit['beta'], np.median(fit['gamma'], axis=1)]
-    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+    # mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
 
     # Autocorrelation
-    sample_arr = np.array(fit.to_frame()[[fit.param_names[i] for i in range(13)]])
-    ess = arviz.ess(arviz.convert_to_dataset(sample_arr.reshape(1,-1,13)))
-    print('Number of effective samples: {}'.format(ess.mean()))
+    # sample_arr = np.array(fit.to_frame()[[fit.param_names[i] for i in range(13)]])
+    # ess = arviz.ess(arviz.convert_to_dataset(sample_arr.reshape(1,-1,13)))
+    # print('Number of effective samples: {}'.format(ess.mean()))
 
     # write results
-    param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
-    generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
-    generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+    # param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
+    # generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
+    # generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
 
-    param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
-    generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
-    generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
+    # param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
+    # generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
+    # generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
 
-    print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
-    print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_predicted_curve(X_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
-    plot_predicted_curve_with_error(X_test, test_bat_ids, params=params, model_id=MODEL_ID)
+    # print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
+    # print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
+    # plot_predicted_curve(X_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    # plot_predicted_curve_with_error(X_test, test_bat_ids, params=params, model_id=MODEL_ID)
