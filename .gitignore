@@ -2,8 +2,9 @@
 #data/
 build/
 
-#ignore Matlab files
+#ignore ide files
 *.asv
+*.vscode
 
 #ignore jupyter notebook files
 .ipynb_checkpoints/
