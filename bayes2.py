@@ -15,7 +15,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 from common import generate_posterior_histograms, generate_traceplots
 
 MODEL_ID = 2
-USE_CACHE = True
+USE_CACHE = False
 
 
 def create_summary_dfs(data):
@@ -171,25 +171,27 @@ def create_features(train_data):
     # print(train_data.groupby(['bat_id']).last().index)
     X_df = train_data.groupby(['bat_id']).last().reset_index(drop=True)
     X_df.columns = X_df.columns.str.lower()
+    X_scaled = scale(X_df.iloc[:, 1:])
 
-    x1_nominal_capacity = train_data.groupby(['bat_id']).nth(5)['QD']
-    x2_variance_100v10 = X_df['variance'].copy()
-    x3_log_min_difference = X_df['log|min(delta(q(v)))|'].copy()
-    x4_chargetime_average = X_df['chargetimeavg cyc1-5'].copy()
-    x5_avg_temperature_integral = X_df['temp integral'].copy()
-    # x6_intercept_2to100 = X_df['intercept 2-100'].copy()
+    x1_nominal_capacity = np.array(train_data.groupby(['bat_id']).nth(5)['QD'])
+    # x2_variance_100v10 = X_df['variance'].copy()
+    # x3_log_min_difference = X_df['log|min(delta(q(v)))|'].copy()
+    # x4_chargetime_average = X_df['chargetimeavg cyc1-5'].copy()
+    # x5_avg_temperature_integral = X_df['temp integral'].copy()
+    # # x6_intercept_2to100 = X_df['intercept 2-100'].copy()
 
-    X = pd.DataFrame({
-        'x1': np.array(x1_nominal_capacity),
-        'x2': np.array(x2_variance_100v10),
-        'x3': np.array(x3_log_min_difference),
-        'x4': np.array(x4_chargetime_average),
-        'x5': np.array(x5_avg_temperature_integral),
-        # 'x6': np.array(x6_intercept_2to100),
-    })
+    # X = pd.DataFrame({
+    #     'x1': np.array(x1_nominal_capacity),
+    #     'x2': np.array(x2_variance_100v10),
+    #     'x3': np.array(x3_log_min_difference),
+    #     'x4': np.array(x4_chargetime_average),
+    #     'x5': np.array(x5_avg_temperature_integral),
+    #     # 'x6': np.array(x6_intercept_2to100),
+    # })
 
-    X_scaled = scale(X)
-    X_scaled[:, 0] = np.array(x1_nominal_capacity)  # overwrite nominal capacity
+    # X_scaled = scale(X_df)
+    X_scaled = np.hstack((x1_nominal_capacity.reshape(-1,1), X_scaled))
+    X_scaled = np.hstack((np.ones((X_df.shape[0],1)), X_scaled))
     return X_scaled
 
 
@@ -238,12 +240,8 @@ def prepare_code_for_stan():
         array[N] int N_BC;          // cycle life for each battery cell
     }
     parameters {
-        vector[N] a_0;
-        vector[N] b_0;
-        real a_mu, b_mu;
-        real a_1, a_2, a_3, a_4, a_5;
-        real b_1, b_2, b_3, b_4, b_5;
-        //real g_0, g_1;
+        real a[d];
+        real b[d];
 
         real<lower=0> sigma;
     }
@@ -257,9 +255,9 @@ def prepare_code_for_stan():
         real scaled_cycle_count;
 
         for(i in 1:N) {
-            alpha[i] = a_0[i] + a_1*X[i,1] + a_2*X[i,2] + a_3*X[i,3] + a_4*X[i,4] + a_5*X[i,5];
-            beta[i] = b_0[i] + b_1*X[i,1] + b_2*X[i,2] + b_3*X[i,3] + b_4*X[i,4] + b_5*X[i,5];
-            gamma[i] = X[i,1];  // first few entries have measurment error
+            alpha[i] = dot_product(X[i], a);
+            beta[i] = dot_product(X[i], b);
+            gamma[i] = X[i,2];  // first few entries have measurment error
 
             for (j in 1:N_BC[i]) {
                 scaled_cycle_count = j / 1000.0;
@@ -271,25 +269,8 @@ def prepare_code_for_stan():
     }
     }
     model {
-        a_0 ~ normal(a_mu, 1);
-        a_1 ~ normal(0, 1);
-        a_2 ~ normal(0, 1);
-        a_3 ~ normal(0, 1);
-        a_4 ~ normal(0, 1);
-        a_5 ~ normal(0, 1);
-
-        b_0 ~ normal(b_mu, 1);
-        b_1 ~ normal(0, 1);
-        b_2 ~ normal(0, 1);
-        b_3 ~ normal(0, 1);
-        b_4 ~ normal(0, 1);
-        b_5 ~ normal(0, 1);
-
-        //g_0 ~ normal(1.1, 1);
-        //g_1 ~ normal(0, 1);
-
-        a_mu ~ normal(3, 1);
-        b_mu ~ normal(2, 1);
+        a ~ normal(0, 5);
+        b ~ normal(0, 5);
         sigma ~ gamma(1, 2);
 
         y ~ normal(y_hat, sigma);
