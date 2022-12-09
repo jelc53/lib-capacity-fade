@@ -75,4 +75,4 @@ def write_file(data_dict, filename):
 
 if __name__ == "__main__":
     data_dict = load_data('batch1.pkl', 'batch2.pkl', 'batch3.pkl')
-    write_file(data_dict, 'part_of_processed_data.pkl')
+    write_file(data_dict, 'processed_data.pkl')
