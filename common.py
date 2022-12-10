@@ -42,7 +42,7 @@ def generate_traceplots(fit_obj, param_list, prefix=''):
     fig, ax = plt.subplots(n_params, 1, sharex=True, figsize=(8, 11))
 
     for j in range(n_params):
-        ax[j].scatter(np.linspace(0, n_samples, num=n_samples), fit_obj[param_list[j]], s=2)
+        ax[j].scatter(np.linspace(0, n_samples, num=n_samples), fit_obj[param_list[j]], s=5)
         ax[j].set_ylabel(param_list[j])
     plt.xlabel('number of samples')
     plt.tight_layout()

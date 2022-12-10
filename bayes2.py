@@ -15,7 +15,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 from common import generate_posterior_histograms, generate_traceplots
 
 MODEL_ID = 2
-USE_CACHE = False
+USE_CACHE = True
 
 
 def create_summary_dfs(data):
@@ -70,7 +70,7 @@ def get_rul(threshold, params, model_id, scale=1000):
     """Helper function to access prediction for remianing useful life"""
     y_val = params[2][0]  # nominal
     count = 0
-    while y_val > threshold or count > 2500:
+    while (y_val > threshold) and (count < 2000):
         count += 1
         scaled_x = count / scale
         y_vals = fetch_model(scaled_x, params, model_id)
@@ -329,10 +329,10 @@ def prepare_params_given_samples(fit, X):
     """Helper function to pull together mle estimates given posterior samples"""
     n_samples = fit.num_samples
 
-    alpha = X @ fit['a']
-    beta = X @ fit['b']
+    alpha = fit['a_0'] + X @ fit['a']
+    beta = fit['b_0'] + X @ fit['b']
 
-    gamma = np.repeat(X[:,1].reshape(-1,1), n_samples, axis=1)
+    gamma = np.repeat(X[:,0].reshape(-1,1), n_samples, axis=1)
 
     return [alpha, beta, gamma]
 
@@ -398,23 +398,20 @@ if __name__ == '__main__':
     # params = map[MODEL_ID]
     params = prepare_params_given_samples(fit, X_test)
     # params = [fit['alpha'], fit['beta'], np.median(fit['gamma'], axis=1)]
-    # mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+    print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
+    print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
 
-    # Autocorrelation
-    # sample_arr = np.array(fit.to_frame()[[fit.param_names[i] for i in range(13)]])
-    # ess = arviz.ess(arviz.convert_to_dataset(sample_arr.reshape(1,-1,13)))
-    # print('Number of effective samples: {}'.format(ess.mean()))
+    # autocorrelation
+    sample_arr = np.array(fit.to_frame()[['a_0', 'b_0', 'sigma']])
+    ess = arviz.ess(arviz.convert_to_dataset(sample_arr.reshape(1, -1, 3)))
+    print('Number of effective samples: {}'.format(ess.mean()))
 
-    # write results
-    # param_list_alpha = ['a_0', 'a_1', 'a_2', 'a_3', 'a_4', 'a_5']
-    # generate_posterior_histograms(fit, param_list_alpha, prefix='bayes_alpha_')
-    # generate_traceplots(fit, param_list_alpha, prefix='bayes_alpha_')
+    # posterior marginals
+    param_list_1 = ['a_0', 'b_0', 'sigma']
+    generate_posterior_histograms(fit, param_list_1, prefix='bayes_alpha_')
+    generate_traceplots(fit, param_list_1, prefix='bayes_alpha_')
 
-    # param_list_beta = ['b_0', 'b_1', 'b_2', 'b_3', 'b_4', 'b_5']
-    # generate_posterior_histograms(fit, param_list_beta, prefix='bayes_beta_')
-    # generate_traceplots(fit, param_list_beta, prefix='bayes_beta_')
-
-    # print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
-    # print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    # plot_predicted_curve(X_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
-    # plot_predicted_curve_with_error(X_test, test_bat_ids, params=params, model_id=MODEL_ID)
+    # plot soh prediction examples
+    # plot_predicted_curve(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_predicted_curve_with_error(y_test, test_bat_ids, params=params, model_id=MODEL_ID)

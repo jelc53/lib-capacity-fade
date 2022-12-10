@@ -57,7 +57,7 @@ def fetch_model(x, params, model_id):
 def get_pred(num_cycles, params, model_id, scale=1000):
     """Helper function to access predictions for discharge capacity"""
     n_samples = params[0].shape[0]
-    params_preproc = [[params[0][i], params[1][i], params[2]] for i in range(n_samples)]
+    params_preproc = [[params[0][i], params[1][i], params[2][i]] for i in range(n_samples)]
 
     x = np.linspace(0, num_cycles, num_cycles) / scale  # / cycle_life
     # y_pred = fetch_model(x, params, model_id)
@@ -68,7 +68,7 @@ def get_pred(num_cycles, params, model_id, scale=1000):
 
 def get_rul(threshold, params, model_id, scale=1000):
     """Helper function to access prediction for remianing useful life"""
-    y_val = params[2]  # nominal
+    y_val = params[2][0]  # nominal
     count = 0
     while y_val > threshold:
         count += 1
@@ -130,7 +130,7 @@ def plot_predicted_curve(y_test, test_bat_ids, params, model_id, num_plots=1, sc
         plt.show(); plt.close()
 
 
-def plot_predicted_curve_with_error(y_test, test_bat_ids, params, model_id, num_plots=1, scale=1000):
+def plot_predicted_curve_with_error(y_test, test_bat_ids, params, model_id, num_plots=10, scale=1000):
     """Plot y_true vs y_pred for specified alpha, beta, gamma"""
     plt.rcParams.update({'font.size': 14})
     for i, id in enumerate(test_bat_ids):
@@ -161,7 +161,7 @@ def plot_predicted_curve_with_error(y_test, test_bat_ids, params, model_id, num_
 
         # outfile = 'example_inv_sigmoid.png'
         # outfile = 'example_exponetial_decay.png'
-        outfile = 'bayes_plot_with_error_' + id + '.png'
+        outfile = 'bayes_plot_with_error_train_' + id + '.png'
         plt.savefig(os.path.join('figs', outfile))
         plt.show(); plt.close()
 
@@ -268,14 +268,14 @@ def prepare_code_for_stan():
     }
     }
     model {
-        a_0 ~ normal(2.5, 1);
+        a_0 ~ normal(5, 1);
         a_1 ~ normal(0, 1);
         a_2 ~ normal(0, 1);
         a_3 ~ normal(0, 1);
         a_4 ~ normal(0, 1);
         a_5 ~ normal(0, 1);
 
-        b_0 ~ normal(2.5, 1);
+        b_0 ~ normal(1, 1);
         b_1 ~ normal(0, 1);
         b_2 ~ normal(0, 1);
         b_3 ~ normal(0, 1);
@@ -398,9 +398,9 @@ if __name__ == '__main__':
     }
     X_test = create_features(test_dat)
     # params = map[MODEL_ID]
-    params = prepare_params_given_samples(fit, X_test)
-    # params = [np.median(fit['alpha'], axis=1), np.median(fit['beta'], axis=1), np.median(fit['gamma'], axis=1)]
-    mse_store, rul_mape_store = evaluate_fit(y_test, params=params, model_id=MODEL_ID)  # y_test
+    # params = prepare_params_given_samples(fit, X_test)
+    params = [fit['alpha'], fit['beta'], fit['gamma']]
+    mse_store, rul_mape_store = evaluate_fit(y_train, params=params, model_id=MODEL_ID)  # y_test
 
     # Autocorrelation
     sample_arr = np.array(fit.to_frame()[[fit.param_names[i] for i in range(13)]])
@@ -418,5 +418,5 @@ if __name__ == '__main__':
 
     print('MSE for Discharge Capacity: {}'.format(np.mean(mse_store)))
     print('MAPE for Remaining Useful Life: {}'.format(np.mean(rul_mape_store)))
-    plot_predicted_curve(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
-    plot_predicted_curve_with_error(y_test, test_bat_ids, params=params, model_id=MODEL_ID)
+    # plot_predicted_curve(y_test, test_bat_ids, params=params, model_id=MODEL_ID)  # test_bat_ids
+    plot_predicted_curve_with_error(y_train, train_bat_ids, params=params, model_id=MODEL_ID)

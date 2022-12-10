@@ -9,3 +9,7 @@ build/
 #ignore jupyter notebook files
 .ipynb_checkpoints/
 __pycache__/
+
+#work in progress
+bayes2.py
+bayes3.py
