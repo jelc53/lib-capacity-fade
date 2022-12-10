@@ -5,8 +5,6 @@ import sys
 np.set_printoptions(threshold=sys.maxsize)
 
 ###Data loading
-import pickle
-
 def load_data(filename):
     with open(filename, 'rb') as f:
         data = pickle.load(f)
@@ -28,20 +26,14 @@ numBat = numBat1+numBat2+numBat3
 test_ind = np.hstack((np.arange(0,(numBat1+numBat2),2),83))
 train_ind = np.arange(1,(numBat1+numBat2-1),2)
 valid_ind = np.arange(numBat-numBat3,numBat);
-
 train_ind = np.hstack((train_ind, valid_ind))
-print(len(train_ind))
-
 test_data = []
-#cycle_life_valid_data = []
 train_data = []
 
 count = 0
 for i in bat_dict.keys():
     if count in test_ind:
         test_data.append(bat_dict[i])
-    #elif count in valid_ind:
-     #   cycle_life_valid_data.append(bat_dict[i]['cycle_life'][0][0])
     else:
         train_data.append(bat_dict[i])
     count += 1
@@ -150,19 +142,19 @@ for i in range(len(test_ind)):
 
 ###Modelling CODE
 from keras.models import Sequential
+import keras.regularizers as kr
 from keras.layers import Dense
 import tensorflow as tf
 model = Sequential()
-model.add(Dense(1000, input_dim=201, activation="relu"))
+#can use kernel_regularizer=kr.l1(0.01) below for l1 regularization, for example
+model.add(Dense(1076, input_dim=201, activation="relu"))
+model.add(Dense(96, activation="relu"))
 model.add(Dense(1))
 
-#loss='mse',
- #   metrics=[tf.keras.metrics.MeanSquaredError()])
 model.compile(loss="mse", optimizer="adam", metrics=[tf.keras.metrics.MeanSquaredError()])
 
 model.fit(train_mat,y, epochs=5000, batch_size=100)
 _, accuracy = model.evaluate(train_mat, y)
-#print("Model accuracy: %.2f"% (accuracy*100))
 
 
 ###Predictions and MAPE calculation
@@ -175,3 +167,60 @@ print(np.mean(np.abs(predictions-y)/y))
 predictionst = model.predict(test_mat)
 yt = yt.reshape(-1,1)
 print(np.mean(np.abs(predictionst-yt)/yt))
+
+
+###Feature importance (of model with 9/20 features used in best model of reference paper)
+features=['log min diff', 'Variance', 'slope 2-100', 'intercept 2-100',
+          'QD cyc 2', 'chargetimeavg cyc1-5', 'Temp integral', 'IR cyc100-cyc2', 'min IR']
+
+import shap
+
+e = shap.KernelExplainer(model, train_mat)
+shap_values = e.shap_values(test_mat)
+
+shap.initjs()
+
+shap.summary_plot(shap_values[0], test_mat, feature_names=features)
+shap.summary_plot(shap_values[0], test_mat, feature_names=features, plot_type="bar")
+
+
+###Hyperparameter tuning
+import keras_tuner as kt
+def model_builder(hp):
+    model = Sequential()
+
+    # Tune the number of units in the first Dense layer
+    # Choose an optimal value between 500-2048
+    hp_units = hp.Int('units', min_value=500, max_value=2048, step=32)
+    model.add(Dense(units=hp_units, input_dim=201, activation='relu'))
+
+    # Tune the number of units in the second Dense layer
+    # Choose an optimal value between 32-512
+    hp_units2 = hp.Int('units_' + str(1), min_value=32, max_value=512, step=32)
+    model.add(Dense(units=hp_units2, activation='relu'))
+
+    model.add(Dense(1))
+
+    # Tune the learning rate for the optimizer
+    # Choose an optimal value from 0.01, 0.001, or 0.0001
+    hp_learning_rate = hp.Choice('learning_rate', values=[1e-2, 1e-3, 1e-4])
+
+    model.compile(loss="mse", optimizer=keras.optimizers.Adam(learning_rate=hp_learning_rate),
+                  metrics=[tf.keras.metrics.MeanSquaredError()])
+
+    return model
+
+
+tuner = kt.Hyperband(model_builder,
+                     objective='val_loss',
+                     max_epochs=10000,
+                     factor=3)
+
+stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+
+tuner.search(train_mat,y, epochs=5000, batch_size=100, validation_split=0.5, callbacks=[stop_early])
+
+# Get the optimal hyperparameters
+best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
+
+print(best_hps.values)

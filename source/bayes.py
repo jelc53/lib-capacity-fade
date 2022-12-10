@@ -9,10 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import scale
 
-from common import load_data, save_pickle
+from utils.common import load_data, save_pickle
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_percentage_error
-from common import generate_posterior_histograms, generate_traceplots
+from utils.common import generate_posterior_histograms, generate_traceplots
 
 MODEL_ID = 2
 USE_CACHE = True
