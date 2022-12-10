@@ -126,7 +126,7 @@ def plot_predicted_curve(y_test, test_bat_ids, params, model_id, num_plots=1, sc
         # outfile = 'example_inv_sigmoid.png'
         # outfile = 'example_exponetial_decay.png'
         outfile = 'bayes_plot_' + id + '.png'
-        plt.savefig(os.path.join('figs', outfile))
+        plt.savefig(os.path.join(os.path.pardir, 'figs', outfile))
         plt.show(); plt.close()
 
 
@@ -162,7 +162,7 @@ def plot_predicted_curve_with_error(y_test, test_bat_ids, params, model_id, num_
         # outfile = 'example_inv_sigmoid.png'
         # outfile = 'example_exponetial_decay.png'
         outfile = 'bayes_plot_with_error_train_' + id + '.png'
-        plt.savefig(os.path.join('figs', outfile))
+        plt.savefig(os.path.join(os.path.pardir, 'figs', outfile))
         plt.show(); plt.close()
 
 
@@ -367,9 +367,9 @@ if __name__ == '__main__':
 
     # load data
     infile = sys.argv[1]
-    data = load_data(os.path.join('data', infile))
-    train_dat = pd.read_csv(os.path.join('data', 'train.csv'))
-    test_dat = pd.read_csv(os.path.join('data', 'test.csv'))
+    data = load_data(os.path.join(os.path.pardir, 'data', infile))
+    train_dat = pd.read_csv(os.path.join(os.path.pardir, 'data', 'train.csv'))
+    test_dat = pd.read_csv(os.path.join(os.path.pardir, 'data', 'test.csv'))
 
     train_bat_ids = sorted(train_dat['bat_id'].unique())
     test_bat_ids = sorted(test_dat['bat_id'].unique())
@@ -387,8 +387,8 @@ if __name__ == '__main__':
         stan_data = prepare_data_for_stan(X_train, y_train)
         posterior = stan.build(stan_code, data=stan_data, random_seed=101)
         fit = posterior.sample(num_samples=1000, num_chains=1)
-        save_pickle(posterior, filename='model_1.pkl')
-        save_pickle(fit, filename='fit_1.pkl')
+        # save_pickle(posterior, filename='model_1.pkl')
+        save_pickle(fit, filename='fit_new.pkl')
 
     # evaluate fit
     n = len(y_test)

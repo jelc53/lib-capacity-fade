@@ -1,7 +1,8 @@
 #ignore data folder
 #data/
 build/
-
+*.zip
+
 #ignore ide files
 *.asv
 *.vscode
